@@ -1,0 +1,114 @@
+app_name: investment-agent
+
+agent:
+  mode: event_radar
+
+openai:
+  model: gpt-5
+
+bigmodel:
+  model: glm-4.6v
+
+wechat:
+  provider: serverchan
+
+moomoo:
+  enabled: false
+  host: 127.0.0.1
+  port: 11111
+  trade_env: REAL
+  market: US
+  security_firm: AUTO
+
+scheduler:
+  timezone: America/New_York
+  run_minutes_before_open: 30
+
+risk:
+  auto_trading: false
+  require_human_confirm: true
+
+watched_symbols:
+  - NVDA
+  - MSFT
+  - AAPL
+  - AMZN
+  - GOOGL
+  - AVGO
+  - TSM
+  - AMD
+  - SMR
+  - CEG
+  - CRWD
+  - PANW
+  - CRWV
+  - VRT
+  - CEG
+  - VST
+  - ETN
+  - PWR
+  - ASML
+  - AMAT
+  - LRCX
+  - ANET
+  - ZS
+  - FTNT
+  - TSLA
+  - MBLY
+
+event_radar:
+  max_items: 100
+  topics:
+    AI算力: AI data center Nvidia GPU cloud stock partnership earnings
+    半导体: semiconductor chip AI memory earnings guidance stock
+    数据中心: data center power demand AI cloud infrastructure stock
+    云计算: cloud computing AI enterprise software stock earnings
+    电力基础设施: power grid electricity infrastructure data center stock
+    核能: nuclear energy reactor data center power stock
+    机器人: robotics automation humanoid robot stock
+    自动驾驶: autonomous driving robotaxi lidar EV stock
+    网络安全: cybersecurity AI software breach stock earnings
+    IPO: US IPO Nasdaq NYSE filing debut technology company
+
+sectors:
+  AI算力:
+    - NVDA
+    - AMD
+    - AVGO
+    - ANET
+  半导体:
+    - TSM
+    - ASML
+    - AMAT
+    - LRCX
+  电力基础设施:
+    - CEG
+    - VST
+    - ETN
+    - PWR
+  数据中心:
+    - EQIX
+    - DLR
+    - VRT
+  云计算:
+    - MSFT
+    - AMZN
+    - GOOGL
+    - NOW
+  核能:
+    - CEG
+    - SMR
+    - URA
+  机器人:
+    - ISRG
+    - ABBNY
+    - TER
+  自动驾驶:
+    - TSLA
+    - MBLY
+    - GOOGL
+  网络安全:
+    - CRWD
+    - PANW
+    - ZS
+    - FTNT
