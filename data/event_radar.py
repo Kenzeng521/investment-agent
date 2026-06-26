@@ -107,15 +107,16 @@ class EventRadarFetcher:
             title = node.findtext("title", default="").strip()
             link = node.findtext("link", default="").strip()
             published = node.findtext("pubDate", default="").strip()
+            clean_title, publisher = self._split_google_news_title(title)
             matched_symbols = self._matched_symbols(title, symbols)
             if symbols and not matched_symbols:
                 continue
             if title:
                 items.append(
                     NewsItem(
-                        title=title,
+                        title=clean_title,
                         url=link,
-                        source=source,
+                        source=publisher or source,
                         published_at=published,
                         symbols=matched_symbols,
                         categories=categories,
@@ -134,6 +135,12 @@ class EventRadarFetcher:
             if any(alias in text for alias in aliases):
                 matched.append(symbol_upper)
         return matched
+
+    def _split_google_news_title(self, title: str) -> tuple[str, str]:
+        if " - " not in title:
+            return title, ""
+        clean_title, publisher = title.rsplit(" - ", 1)
+        return clean_title.strip(), publisher.strip()
 
     def _google_news_url(self, query: str) -> str:
         return (

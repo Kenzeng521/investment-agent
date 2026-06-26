@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Iterable, List, Sequence
 
+from analysis.fact_verifier import FactVerifier
 from schemas import EquityCandidate, MarketEvent, NewsItem
 
 
@@ -92,6 +93,7 @@ TICKER_NAMES = {
 class EventAnalyzer:
     def __init__(self, candidate_universe: Sequence[str] | None = None):
         self.candidate_universe = {symbol.upper() for symbol in (candidate_universe or [])}
+        self.fact_verifier = FactVerifier()
 
     def analyze(self, news: Iterable[NewsItem]) -> tuple[List[MarketEvent], List[EquityCandidate]]:
         events = [self._score_event(item) for item in news if item.title]
@@ -116,6 +118,7 @@ class EventAnalyzer:
         score = max(0, min(100, score))
         impact = "利好" if score >= 70 else "风险" if score <= 45 else "中性"
         rationale = "、".join(reasons[:4]) if reasons else "主题相关新闻，需进一步验证对收入、订单或估值的影响"
+        verification = self.fact_verifier.verify(item)
         return MarketEvent(
             title=item.title,
             url=item.url,
@@ -126,6 +129,9 @@ class EventAnalyzer:
             importance_score=score,
             impact=impact,
             rationale=rationale,
+            verification_status=verification.status,
+            verification_score=verification.score,
+            verification_reason=verification.reason,
         )
 
     def _infer_category(self, title: str) -> str:

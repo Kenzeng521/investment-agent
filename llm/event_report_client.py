@@ -9,6 +9,7 @@ from loguru import logger
 
 from config import Settings
 from schemas import EquityCandidate, MarketEvent
+from macro_market_intelligence_engine import MacroMarketIntelligenceReport
 
 
 def _dump_items(items) -> list[dict]:
@@ -19,6 +20,17 @@ def _dump_items(items) -> list[dict]:
         else:
             result.append(item.dict())
     return result
+
+
+def _strip_markdown_fence(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```markdown"):
+        stripped = stripped[len("```markdown") :].strip()
+    elif stripped.startswith("```"):
+        stripped = stripped[3:].strip()
+    if stripped.endswith("```"):
+        stripped = stripped[:-3].strip()
+    return stripped
 
 
 class LocalEventRadarRenderer:
@@ -43,7 +55,7 @@ class LocalEventRadarRenderer:
         for event in top_events:
             symbols = ", ".join(event.symbols) if event.symbols else "未映射"
             lines.append(
-                f"- **[{event.category}] {event.title}**：评分 {event.importance_score}，影响 {event.impact}，相关标的 {symbols}。{event.rationale}"
+                f"- **[{event.category}] {event.title}**：评分 {event.importance_score}，影响 {event.impact}，可信度 {event.verification_status}，相关标的 {symbols}。{event.rationale}"
             )
         lines.extend(["", "## 候选跟踪池", ""])
         if not top_candidates:
@@ -147,7 +159,7 @@ class EventRadarReportClient:
                 if content.strip():
                     if attempt > 1:
                         logger.info("BigModel event radar report succeeded on retry {}", attempt)
-                    return content.strip()
+                    return _strip_markdown_fence(content)
             except Exception as exc:
                 logger.warning(
                     "BigModel event radar report attempt {}/{} failed: {}",
@@ -202,3 +214,19 @@ class EventRadarReportClient:
 ## 风险与噪音过滤
 ## 今日关注清单
 """
+
+
+def merge_macro_and_event_reports(
+    macro_report: MacroMarketIntelligenceReport | None, event_report: str
+) -> str:
+    if not macro_report:
+        return event_report
+    return "\n\n".join(
+        [
+            "# 开盘前市场资金状态与科技事件雷达",
+            "## Macro Market Intelligence",
+            macro_report.to_wechat_text(),
+            "## Technology Event Radar",
+            event_report,
+        ]
+    )

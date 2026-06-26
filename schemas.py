@@ -61,6 +61,9 @@ class MarketEvent(BaseModel):
     importance_score: int = 50
     impact: str = "中性"
     rationale: str = ""
+    verification_status: str = "需验证"
+    verification_score: int = 50
+    verification_reason: str = ""
 
 
 class EquityCandidate(BaseModel):

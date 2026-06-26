@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 from pathlib import Path
 
 from loguru import logger
@@ -11,12 +12,15 @@ from analysis.risk_engine import RiskEngine
 from broker.moomoo_client import MoomooClient
 from config import BASE_DIR, load_settings
 from data.event_radar import DEFAULT_EVENT_TOPICS, EventRadarFetcher
+from data.macro_data import MacroDataClient
 from data.market_data import MarketDataClient
 from data.news_fetcher import NewsFetcher
 from data.sector_scanner import DEFAULT_SECTOR_KEYWORDS, SectorScanner
-from llm.event_report_client import EventRadarReportClient
+from llm.event_report_client import EventRadarReportClient, merge_macro_and_event_reports
 from llm.openai_client import OpenAIReportClient
 from logging_config import setup_logging
+from macro_market_intelligence_engine import MacroMarketIntelligenceEngine, default_registry
+from notify.push_monitor import PushMonitor
 from notify.wechat_bot import WeChatNotifier
 from scheduler.market_calendar import MarketCalendar
 from schemas import AgentRunResult, EventRadarRunResult
@@ -39,12 +43,12 @@ def run(force: bool = False, notify: bool = True) -> AgentRunResult | EventRadar
         return None
 
     if settings.agent_mode == "event_radar":
-        return run_event_radar(settings, notify=notify)
+        return run_event_radar(settings, notify=notify, allow_duplicate=force)
 
     return run_portfolio_analysis(settings, notify=notify)
 
 
-def run_event_radar(settings, notify: bool = True) -> EventRadarRunResult:
+def run_event_radar(settings, notify: bool = True, allow_duplicate: bool = False) -> EventRadarRunResult:
     logger.info("Starting US equity technology event radar")
     topics = settings.event_topics or DEFAULT_EVENT_TOPICS
     news = EventRadarFetcher().fetch(
@@ -53,7 +57,10 @@ def run_event_radar(settings, notify: bool = True) -> EventRadarRunResult:
         max_items=settings.event_max_items,
     )
     events, candidates = EventAnalyzer(candidate_universe=settings.watched_symbols).analyze(news)
-    report = EventRadarReportClient(settings).generate_report(events, candidates)
+    macro_snapshot = MacroDataClient().get_snapshot()
+    macro_report = MacroMarketIntelligenceEngine(default_registry()).analyze(macro_snapshot)
+    event_report = EventRadarReportClient(settings).generate_report(events, candidates)
+    report = merge_macro_and_event_reports(macro_report, event_report)
 
     output_dir = BASE_DIR / "reports"
     output_dir.mkdir(exist_ok=True)
@@ -61,12 +68,20 @@ def run_event_radar(settings, notify: bool = True) -> EventRadarRunResult:
     report_path.write_text(report, encoding="utf-8")
     logger.info("Event radar report written to {}", report_path)
 
-    if notify:
-        WeChatNotifier(
+    push_monitor = PushMonitor(BASE_DIR / "logs" / "push_state.json")
+    report_day = date.fromisoformat(macro_snapshot.as_of)
+    if notify and not allow_duplicate and push_monitor.was_successful("event_radar", report_day):
+        logger.info("Skip WeChat notification; event_radar already pushed successfully for {}", report_day)
+    elif notify:
+        ok = WeChatNotifier(
             provider=settings.wechat_provider,
             send_key=settings.serverchan_send_key,
             pushplus_token=settings.pushplus_token,
         ).send_markdown(report)
+        if ok:
+            push_monitor.record_success("event_radar", report_day, report_path=str(report_path))
+        else:
+            push_monitor.record_failure("event_radar", report_day, error="notifier returned false")
 
     result = EventRadarRunResult(
         report_markdown=report,
@@ -77,6 +92,7 @@ def run_event_radar(settings, notify: bool = True) -> EventRadarRunResult:
             "mode": "event_radar",
             "event_count": len(events),
             "candidate_count": len(candidates),
+            "macro_regime": macro_report.market_regime.regime,
         },
     )
     logger.info("US equity technology event radar completed")

@@ -83,6 +83,8 @@ def test_engine_identifies_risk_on_when_liquidity_and_risk_appetite_improve():
 
     assert report.market_regime.regime == "Risk-On"
     assert report.position_preference == "成长 / AI / 高β偏多"
+    assert "流动性扩张先压低风险偏好" not in report.asset_impacts["ATXI"].impact_path
+    assert "一旦流动性收紧" in report.asset_impacts["ATXI"].impact_path
 
 
 def test_engine_supports_extensible_asset_registration_and_json_text_output():

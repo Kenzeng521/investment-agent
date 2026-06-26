@@ -1,7 +1,7 @@
 import requests
 
 from config import Settings
-from llm.event_report_client import EventRadarReportClient, LocalEventRadarRenderer
+from llm.event_report_client import EventRadarReportClient, LocalEventRadarRenderer, _strip_markdown_fence
 from schemas import EquityCandidate, MarketEvent
 
 
@@ -81,3 +81,7 @@ def test_bigmodel_event_report_retries_and_uses_bounded_prompt(monkeypatch):
     assert "T1" in user_prompt
     assert "T2" not in user_prompt
     assert "# 美股科技成长事件雷达" in report
+
+
+def test_strip_markdown_fence_from_llm_response():
+    assert _strip_markdown_fence("```markdown\n# 标题\n```") == "# 标题"
