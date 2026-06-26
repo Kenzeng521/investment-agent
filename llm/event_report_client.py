@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from time import sleep
 from typing import List
 
 import requests
@@ -82,11 +83,11 @@ class EventRadarReportClient:
         self,
         settings: Settings,
         base_url: str = "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-        timeout_seconds: int = 60,
+        timeout_seconds: int | None = None,
     ):
         self.settings = settings
         self.base_url = base_url
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = timeout_seconds or settings.llm_timeout_seconds
         self.fallback_renderer = LocalEventRadarRenderer()
 
     def generate_report(self, events: List[MarketEvent], candidates: List[EquityCandidate]) -> str:
@@ -117,32 +118,47 @@ class EventRadarReportClient:
             return self.fallback_renderer.render(events, candidates)
 
     def _generate_with_bigmodel(self, events: List[MarketEvent], candidates: List[EquityCandidate]) -> str:
+        prompt_events = events[: self.settings.llm_event_limit]
+        prompt_candidates = candidates[: self.settings.llm_candidate_limit]
         payload = {
             "model": self.settings.bigmodel_model,
             "messages": [
                 {"role": "system", "content": self._system_prompt()},
-                {"role": "user", "content": self._build_prompt(events, candidates)},
+                {"role": "user", "content": self._build_prompt(prompt_events, prompt_candidates)},
             ],
             "temperature": 0.2,
-            "max_tokens": 3000,
+            "max_tokens": self.settings.llm_max_tokens,
         }
-        try:
-            response = requests.post(
-                self.base_url,
-                headers={
-                    "Authorization": f"Bearer {self.settings.bigmodel_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-                timeout=self.timeout_seconds,
-            )
-            response.raise_for_status()
-            body = response.json()
-            content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
-            return content.strip() or self.fallback_renderer.render(events, candidates)
-        except Exception as exc:
-            logger.warning("BigModel event radar report failed: {}", exc.__class__.__name__)
-            return self.fallback_renderer.render(events, candidates)
+        attempts = max(1, self.settings.llm_retry_attempts)
+        for attempt in range(1, attempts + 1):
+            try:
+                response = requests.post(
+                    self.base_url,
+                    headers={
+                        "Authorization": f"Bearer {self.settings.bigmodel_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=self.timeout_seconds,
+                )
+                response.raise_for_status()
+                body = response.json()
+                content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if content.strip():
+                    if attempt > 1:
+                        logger.info("BigModel event radar report succeeded on retry {}", attempt)
+                    return content.strip()
+            except Exception as exc:
+                logger.warning(
+                    "BigModel event radar report attempt {}/{} failed: {}",
+                    attempt,
+                    attempts,
+                    exc.__class__.__name__,
+                )
+                if attempt < attempts:
+                    sleep(min(attempt, 3))
+        logger.warning("Using local event radar renderer after BigModel failures")
+        return self.fallback_renderer.render(events, candidates)
 
     def _system_prompt(self) -> str:
         return (
@@ -158,6 +174,7 @@ class EventRadarReportClient:
 
 硬性要求：
 - 日期必须写为：{report_date}。
+- 输出控制在 900 字以内，语言稳定、克制、适合每日微信推送。
 - 聚焦 AI、半导体、云计算、数据中心、电力、核能、机器人、自动驾驶、网络安全、IPO。
 - 输出重大事件和候选跟踪池。
 - 候选跟踪池只是研究优先级，不是买入建议。
@@ -169,10 +186,10 @@ class EventRadarReportClient:
 - 涉及 IPO、并购、监管、业绩和订单时，优先写“标题显示/报道提到”，除非事件标题本身来自公司公告或 SEC 文件。
 
 事件：
-{_dump_items(events[:40])}
+{_dump_items(events)}
 
 候选：
-{_dump_items(candidates[:20])}
+{_dump_items(candidates)}
 
 输出格式：
 # 美股科技成长事件雷达

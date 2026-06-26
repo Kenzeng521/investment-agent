@@ -9,6 +9,13 @@ openai:
 bigmodel:
   model: glm-4.6v
 
+llm:
+  timeout_seconds: 45
+  retry_attempts: 2
+  max_tokens: 1600
+  event_limit: 18
+  candidate_limit: 10
+
 wechat:
   provider: serverchan
 

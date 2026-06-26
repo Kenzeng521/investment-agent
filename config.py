@@ -42,6 +42,11 @@ class Settings:
     openai_model: str = "gpt-5"
     bigmodel_api_key: str = ""
     bigmodel_model: str = "glm-4.6v"
+    llm_timeout_seconds: int = 45
+    llm_retry_attempts: int = 2
+    llm_max_tokens: int = 1600
+    llm_event_limit: int = 18
+    llm_candidate_limit: int = 10
     wechat_webhook_url: str = ""
     wechat_provider: str = "serverchan"
     serverchan_send_key: str = ""
@@ -68,6 +73,7 @@ def load_settings(config_path: Path | None = None) -> Settings:
 
     moomoo = raw.get("moomoo", {})
     openai = raw.get("openai", {})
+    llm = raw.get("llm", {})
     scheduler = raw.get("scheduler", {})
     risk = raw.get("risk", {})
 
@@ -84,6 +90,11 @@ def load_settings(config_path: Path | None = None) -> Settings:
         openai_model=os.getenv("OPENAI_MODEL", openai.get("model", "gpt-5")),
         bigmodel_api_key=os.getenv("BIGMODEL_API_KEY", ""),
         bigmodel_model=os.getenv("BIGMODEL_MODEL", raw.get("bigmodel", {}).get("model", "glm-4.6v")),
+        llm_timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", llm.get("timeout_seconds", 45))),
+        llm_retry_attempts=int(os.getenv("LLM_RETRY_ATTEMPTS", llm.get("retry_attempts", 2))),
+        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", llm.get("max_tokens", 1600))),
+        llm_event_limit=int(os.getenv("LLM_EVENT_LIMIT", llm.get("event_limit", 18))),
+        llm_candidate_limit=int(os.getenv("LLM_CANDIDATE_LIMIT", llm.get("candidate_limit", 10))),
         wechat_webhook_url=os.getenv("WECHAT_WEBHOOK_URL", ""),
         wechat_provider=os.getenv("WECHAT_PROVIDER", raw.get("wechat", {}).get("provider", "serverchan")),
         serverchan_send_key=os.getenv("SERVERCHAN_SEND_KEY", ""),

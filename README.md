@@ -151,6 +151,11 @@ OPENAI_MODEL=gpt-5
 
 BIGMODEL_API_KEY=your_bigmodel_api_key
 BIGMODEL_MODEL=glm-4.6v
+LLM_TIMEOUT_SECONDS=45
+LLM_RETRY_ATTEMPTS=2
+LLM_MAX_TOKENS=1600
+LLM_EVENT_LIMIT=18
+LLM_CANDIDATE_LIMIT=10
 
 AGENT_MODE=event_radar
 EVENT_MAX_ITEMS=100
@@ -168,6 +173,7 @@ TIMEZONE=America/New_York
 说明：
 
 - 如果没有 OpenAI API Key，可以只配置 `BIGMODEL_API_KEY`。
+- `LLM_*` 参数用于控制模型稳定性：限制输入事件数量、输出长度、超时时间和重试次数，避免每日推送卡死。
 - 如果使用 ServerChan，配置 `SERVERCHAN_SEND_KEY`。
 - 如果使用 PushPlus，设置 `WECHAT_PROVIDER=pushplus` 并配置 `PUSHPLUS_TOKEN`。
 - `.env` 包含密钥，不要提交到 GitHub。
@@ -367,6 +373,18 @@ PushPlus 示例：
 WECHAT_PROVIDER=pushplus
 PUSHPLUS_TOKEN=your_pushplus_token
 ```
+
+## 稳定性与降级机制
+
+LLM API 偶尔会因为网络波动、服务端排队或输出过长而超时。项目的处理策略是：
+
+- 限制发送给模型的事件数量和候选数量。
+- 限制模型最大输出 token。
+- BigModel 请求失败后自动重试。
+- 重试仍失败时，使用本地稳定 Markdown 渲染器生成报告。
+- 即使模型超时，日报仍会生成并推送，只是语言更模板化。
+
+这意味着自动化任务优先保证“每天有稳定报告”，而不是因为模型服务波动导致整条微信推送链路失败。
 
 ## 成功案例
 
