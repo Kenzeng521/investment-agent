@@ -19,6 +19,20 @@
 - 网络安全
 - IPO / 新上市公司
 
+项目也包含一个独立核心模块 `macro_market_intelligence_engine`，用于识别每日市场的资金状态，而不是预测价格。它会把宏观变量统一解释为：
+
+```text
+宏观变量变化 -> 流动性变化 -> 风险偏好变化 -> 资金流变化 -> 估值变化 -> 个股反应
+```
+
+该模块输出唯一市场状态：
+
+- `Risk-On`
+- `Repricing`
+- `Risk-Off`
+
+并机制化解释 MSFT、ATXI 以及可扩展股票的资金影响路径。
+
 每天报告会包含：
 
 - 今日结论
@@ -189,6 +203,60 @@ reports/latest.md
 ```text
 logs/investment-agent.log
 ```
+
+## Macro Market Intelligence Engine
+
+`macro_market_intelligence_engine` 是与微信发送模块解耦的核心投研模块，只输出结构化 JSON 和微信可读文本，不负责发送消息。
+
+Python 用法：
+
+```python
+from macro_market_intelligence_engine import (
+    MacroIndicatorReading,
+    MacroMarketIntelligenceEngine,
+    MacroSnapshot,
+    default_registry,
+)
+
+snapshot = MacroSnapshot(
+    as_of="2026-06-26",
+    indicators=[
+        MacroIndicatorReading(name="10Y", value=4.5, change=0.12),
+        MacroIndicatorReading(name="RealYield", value=2.1, change=0.08),
+        MacroIndicatorReading(name="DXY", value=106.0, change=0.7),
+        MacroIndicatorReading(name="VIX", value=24.0, change=4.0),
+        MacroIndicatorReading(name="ETF_Flows", value=-4.2, change=-4.2),
+    ],
+)
+
+report = MacroMarketIntelligenceEngine(default_registry()).analyze(snapshot)
+print(report.to_wechat_text())
+print(report.to_json_dict())
+```
+
+CLI 用法：
+
+```bash
+python scripts/run_macro_market_intelligence.py --input macro_snapshot.json --format wechat
+python scripts/run_macro_market_intelligence.py --input macro_snapshot.json --format json
+```
+
+输入 JSON 示例：
+
+```json
+{
+  "as_of": "2026-06-26",
+  "indicators": [
+    {"name": "10Y", "value": 4.5, "change": 0.12},
+    {"name": "RealYield", "value": 2.1, "change": 0.08},
+    {"name": "DXY", "value": 106.0, "change": 0.7},
+    {"name": "VIX", "value": 24.0, "change": 4.0},
+    {"name": "ETF_Flows", "value": -4.2, "change": -4.2}
+  ]
+}
+```
+
+股票和宏观指标通过注册表扩展，无需修改核心引擎逻辑。
 
 ## 自动执行时间
 
